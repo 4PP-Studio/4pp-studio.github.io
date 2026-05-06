@@ -156,18 +156,28 @@
 
     @media (max-width: 768px) {
         .hero {
-            padding: 100px 20px 72px;
+            min-height: 90vh;
+            padding: 60px 20px 88px 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .hero-logo img {
-            max-width: 160px;
+            max-width: 210px;
+        }
+
+        .hero h1 {
+            font-size: clamp(42px, 10vw, 56px);
+            margin-bottom: 20px;
         }
 
         .hero p {
-            font-size: 15px;
+            font-size: 1.5rem;
             line-height: 1.5;
-            margin-bottom: 36px;
+            margin-bottom: 42px;
             max-width: 100%;
+            text-align: justify;
         }
 
         .apple-cta {
@@ -177,9 +187,10 @@
         }
 
         .apple-btn {
-            width: 100%;
-            font-size: 16px;
-            padding: 12px 20px;
+            margin: 0 auto;
+            width: 70%;
+            font-size: 1.5rem;
+            padding: 24px 10px;
         }
 
         .scroll-indicator {
@@ -189,12 +200,13 @@
 
     @media (max-width: 480px) {
         .hero {
-            padding: 88px 16px 64px;
+            min-height: 88vh;
+            padding: 104px 16px 72px;
         }
 
         .hero h1 {
-            font-size: clamp(34px, 11vw, 44px);
-            margin-bottom: 16px;
+            font-size: clamp(40px, 12vw, 48px);
+            margin-bottom: 18px;
         }
 
         .hero-logo {
@@ -202,7 +214,7 @@
         }
 
         .hero-logo img {
-            max-width: 130px;
+            max-width: 170px;
         }
     }
 </style>
