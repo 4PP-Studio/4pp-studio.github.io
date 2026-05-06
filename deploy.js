@@ -99,7 +99,11 @@ function main() {
 
     console.log(`2) Preparing '${PROD_BRANCH}' branch in isolated worktree...`);
     const fetchResult = runCapture("git", ["fetch", "origin", PROD_BRANCH]);
-    if (!fetchResult.ok) {
+    const missingRemoteBranch = fetchResult.stderr.includes(`couldn't find remote ref ${PROD_BRANCH}`);
+    if (!fetchResult.ok && !missingRemoteBranch) {
+      throw new Error(`Failed to fetch origin/${PROD_BRANCH}: ${fetchResult.stderr || "unknown error"}`);
+    }
+    if (!fetchResult.ok && missingRemoteBranch) {
       console.log(`'origin/${PROD_BRANCH}' not found yet. First deploy will create it.`);
     }
 
@@ -113,7 +117,10 @@ function main() {
     } else if (remoteBranch.ok) {
       run("git", ["worktree", "add", "--force", "-B", PROD_BRANCH, worktreePath, `origin/${PROD_BRANCH}`]);
     } else {
-      run("git", ["worktree", "add", "--force", "-b", PROD_BRANCH, worktreePath, "HEAD"]);
+      // Create first prod deploy on an orphan branch so no source files/history leak in.
+      run("git", ["worktree", "add", "--force", "--detach", worktreePath, "HEAD"]);
+      run("git", ["checkout", "--orphan", PROD_BRANCH], { cwd: worktreePath });
+      run("git", ["reset"], { cwd: worktreePath });
     }
     worktreeCreated = true;
 
