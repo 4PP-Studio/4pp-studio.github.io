@@ -1,79 +1,146 @@
-import { execSync } from 'child_process';
-import fs from 'fs';
-import path from 'path';
+import { existsSync, readdirSync, rmSync, statSync, cpSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 
-function runCommand(command, description) {
-  console.log(`\n${description}...`);
-  try {
-    execSync(command, { stdio: 'inherit' });
-    console.log(`✓ ${description} completed`);
-  } catch (error) {
-    console.error(`✗ ${description} failed`);
-    process.exit(1);
-  }
-}
+const PROD_BRANCH = "prod";
+const DIST_DIR = "dist";
+const WORKTREE_DIR = ".deploy_prod_worktree";
 
-function cleanDirectory(dir) {
-  if (fs.existsSync(dir)) {
-    fs.readdirSync(dir).forEach((file) => {
-      const filePath = path.join(dir, file);
-      const stat = fs.statSync(filePath);
-      if (stat.isDirectory()) {
-        fs.rmSync(filePath, { recursive: true, force: true });
-      } else {
-        fs.unlinkSync(filePath);
-      }
-    });
-  }
-}
+function run(command, args, options = {}) {
+  const printable = `${command} ${args.join(" ")}`;
+  console.log(`\n> ${printable}`);
 
-function copyDirectory(src, dest) {
-  if (!fs.existsSync(dest)) {
-    fs.mkdirSync(dest, { recursive: true });
-  }
-  fs.readdirSync(src).forEach((file) => {
-    const srcPath = path.join(src, file);
-    const destPath = path.join(dest, file);
-    const stat = fs.statSync(srcPath);
-    if (stat.isDirectory()) {
-      copyDirectory(srcPath, destPath);
-    } else {
-      fs.copyFileSync(srcPath, destPath);
-    }
+  const isNpm = command === "npm";
+  const executable = isNpm && process.env.npm_execpath ? process.execPath : command;
+  const executableArgs = isNpm && process.env.npm_execpath ? [process.env.npm_execpath, ...args] : args;
+  const result = spawnSync(executable, executableArgs, {
+    stdio: "inherit",
+    ...options,
   });
+
+  if (result.status !== 0) {
+    throw new Error(`Command failed: ${printable}`);
+  }
 }
 
-console.log('🚀 Starting deployment to prod branch...\n');
+function runCapture(command, args, options = {}) {
+  const isNpm = command === "npm";
+  const executable = isNpm && process.env.npm_execpath ? process.execPath : command;
+  const executableArgs = isNpm && process.env.npm_execpath ? [process.env.npm_execpath, ...args] : args;
+  const result = spawnSync(executable, executableArgs, {
+    encoding: "utf-8",
+    ...options,
+  });
 
-// Save current branch
-const currentBranch = execSync('git branch --show-current', { encoding: 'utf-8' }).trim();
+  return {
+    ok: result.status === 0,
+    stdout: (result.stdout || "").trim(),
+    stderr: (result.stderr || "").trim(),
+    status: result.status,
+  };
+}
 
-// Build the project
-runCommand('npm run build', 'Building project');
+function ensureGitRepo() {
+  const probe = runCapture("git", ["rev-parse", "--is-inside-work-tree"]);
+  if (!probe.ok || probe.stdout !== "true") {
+    throw new Error("Current directory is not a git repository.");
+  }
+}
 
-// Checkout prod branch
-runCommand('git checkout prod', 'Switching to prod branch');
+function removePathIfExists(path) {
+  if (existsSync(path)) {
+    rmSync(path, { recursive: true, force: true });
+  }
+}
 
-// Clean prod branch (keep .git folder)
-console.log('\nCleaning prod branch...');
-cleanDirectory('.');
-console.log('✓ Prod branch cleaned');
+function clearWorktreeFiles(worktreePath) {
+  const entries = readdirSync(worktreePath);
+  for (const entry of entries) {
+    if (entry === ".git") {
+      continue;
+    }
+    rmSync(join(worktreePath, entry), { recursive: true, force: true });
+  }
+}
 
-// Copy dist contents to prod
-console.log('\nCopying dist to prod...');
-copyDirectory('dist', '.');
-console.log('✓ Files copied');
+function copyDistToWorktree(repoRoot, worktreePath) {
+  const distPath = join(repoRoot, DIST_DIR);
 
-// Add all files
-runCommand('git add .', 'Staging files');
+  if (!existsSync(distPath) || !statSync(distPath).isDirectory()) {
+    throw new Error(`Build output not found: ${DIST_DIR}`);
+  }
 
-// Commit
-runCommand('git commit -m "Deploy to prod"', 'Committing changes');
+  const files = readdirSync(distPath);
+  for (const entry of files) {
+    const source = join(distPath, entry);
+    const target = join(worktreePath, entry);
+    cpSync(source, target, { recursive: true });
+  }
 
-// Push to prod
-runCommand('git push origin prod', 'Pushing to prod');
+  // Prevents GitHub Pages from ignoring files/directories that start with "_".
+  writeFileSync(join(worktreePath, ".nojekyll"), "");
+}
 
-// Return to original branch
-runCommand(`git checkout ${currentBranch}`, `Switching back to ${currentBranch}`);
+function hasChanges(cwd) {
+  const status = runCapture("git", ["status", "--porcelain"], { cwd });
+  return status.ok && status.stdout.length > 0;
+}
 
-console.log('\n✅ Deployment completed successfully!');
+function main() {
+  const repoRoot = process.cwd();
+  const worktreePath = resolve(repoRoot, WORKTREE_DIR);
+  let worktreeCreated = false;
+
+  try {
+    ensureGitRepo();
+
+    console.log("1) Building project on current branch...");
+    run("npm", ["run", "build"]);
+
+    console.log(`2) Preparing '${PROD_BRANCH}' branch in isolated worktree...`);
+    const fetchResult = runCapture("git", ["fetch", "origin", PROD_BRANCH]);
+    if (!fetchResult.ok) {
+      console.log(`'origin/${PROD_BRANCH}' not found yet. First deploy will create it.`);
+    }
+
+    removePathIfExists(worktreePath);
+
+    const localBranch = runCapture("git", ["show-ref", "--verify", "--quiet", `refs/heads/${PROD_BRANCH}`]);
+    const remoteBranch = runCapture("git", ["show-ref", "--verify", "--quiet", `refs/remotes/origin/${PROD_BRANCH}`]);
+
+    if (localBranch.ok) {
+      run("git", ["worktree", "add", "--force", worktreePath, PROD_BRANCH]);
+    } else if (remoteBranch.ok) {
+      run("git", ["worktree", "add", "--force", "-B", PROD_BRANCH, worktreePath, `origin/${PROD_BRANCH}`]);
+    } else {
+      run("git", ["worktree", "add", "--force", "-b", PROD_BRANCH, worktreePath, "HEAD"]);
+    }
+    worktreeCreated = true;
+
+    console.log(`3) Replacing '${PROD_BRANCH}' branch contents with '${DIST_DIR}' output...`);
+    clearWorktreeFiles(worktreePath);
+    copyDistToWorktree(repoRoot, worktreePath);
+
+    run("git", ["add", "-A"], { cwd: worktreePath });
+
+    if (!hasChanges(worktreePath)) {
+      console.log("\nNo changes to deploy. Branch is already up to date.");
+      return;
+    }
+
+    run("git", ["commit", "-m", "Deploy static site"], { cwd: worktreePath });
+    run("git", ["push", "-u", "origin", PROD_BRANCH], { cwd: worktreePath });
+
+    console.log("\nDeploy completed successfully.");
+  } finally {
+    if (worktreeCreated) {
+      try {
+        run("git", ["worktree", "remove", "--force", worktreePath]);
+      } catch (error) {
+        console.warn(`Could not remove temporary worktree: ${String(error)}`);
+      }
+    }
+  }
+}
+
+main();
