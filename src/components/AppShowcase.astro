@@ -220,9 +220,17 @@
     }
 
     @media (max-width: 768px) {
+        .app-showcase {
+            padding: 0 16px 80px;
+        }
+
+        .app-showcase-header {
+            margin-bottom: 40px;
+        }
+
         .showcase-grid {
             grid-template-columns: 1fr;
-            gap: 16px;
+            gap: 14px;
         }
 
         .showcase-item.large,
@@ -231,20 +239,36 @@
         }
 
         .showcase-item {
-            padding: 50px 35px;
+            padding: 34px 24px;
+            gap: 16px;
         }
 
         .showcase-icon-wrapper {
-            width: 64px;
-            height: 64px;
+            width: 60px;
+            height: 60px;
         }
 
         .showcase-content h3 {
-            font-size: 26px;
+            font-size: 22px;
         }
 
         .showcase-content p {
-            font-size: 18px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .store-badge {
+            height: 36px;
+        }
+
+        .website-link {
+            font-size: 17px;
+        }
+    }
+
+    @media (hover: none) {
+        .showcase-item:hover {
+            box-shadow: none;
         }
     }
 </style>
