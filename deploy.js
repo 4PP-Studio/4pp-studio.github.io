@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 const PROD_BRANCH = "prod";
 const DIST_DIR = "dist";
 const WORKTREE_DIR = ".deploy_prod_worktree";
+const CUSTOM_DOMAIN = "4pp.studio";
 
 function run(command, args, options = {}) {
   const printable = `${command} ${args.join(" ")}`;
@@ -79,6 +80,11 @@ function copyDistToWorktree(repoRoot, worktreePath) {
 
   // Prevents GitHub Pages from ignoring files/directories that start with "_".
   writeFileSync(join(worktreePath, ".nojekyll"), "");
+
+  // Keep GitHub Pages custom domain mapping on prod branch.
+  if (CUSTOM_DOMAIN) {
+    writeFileSync(join(worktreePath, "CNAME"), `${CUSTOM_DOMAIN}\n`);
+  }
 }
 
 function hasChanges(cwd) {
