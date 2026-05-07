@@ -7,7 +7,7 @@ lastUpdated: "2026-05-07"
 
 ## Toplanan kişisel veri
 
-Bu kapsamda **kişisel veri toplamıyoruz**. Yalnızca, kendi e-posta istemciniz üzerinden **4ppstudioss@gmail.com** adresine yazmayı tercih ederseniz, gönderdiğiniz mesajdaki bilgiler doğal olarak iletişim için tarafımıza ulaşır; bu tamamen sizin tercihinizdir.
+Bu kapsamda **kişisel veri toplamıyoruz**. Yalnızca, kendi e-posta istemciniz üzerinden **info@4pp.studio** adresine yazmayı tercih ederseniz, gönderdiğiniz mesajdaki bilgiler doğal olarak iletişim için tarafımıza ulaşır; bu tamamen sizin tercihinizdir.
 
 ## Barındırma ve teknik kayıtlar
 
@@ -23,4 +23,4 @@ Mobil uygulamalarımızın her biri için ayrı gizlilik politikaları veya ilgi
 
 ## İletişim
 
-Bu özet hakkında sorularınız için: **4ppstudioss@gmail.com**
+Bu özet hakkında sorularınız için: **info@4pp.studio**
